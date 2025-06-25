@@ -1,11 +1,209 @@
 <!DOCTYPE html>
 <html lang="it">
 <head>
-  <meta charset="UTF-8" />
-  <title>Il mio BnB</title>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>BnB Iris - Organizzazione Prenotazioni</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    margin: 20px;
+    background: #f4f7f9;
+  }
+  h1 {
+    color: #2c3e50;
+  }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    margin-top: 20px;
+  }
+  th, td {
+    border: 1px solid #ddd;
+    text-align: center;
+    padding: 8px;
+  }
+  th {
+    background-color: #3498db;
+    color: white;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+  }
+  td.booked {
+    background-color: #e74c3c;
+    color: white;
+    cursor: pointer;
+  }
+  td.free {
+    background-color: #2ecc71;
+    color: white;
+    cursor: pointer;
+  }
+  #legend {
+    margin-top: 15px;
+  }
+  #legend span {
+    display: inline-block;
+    padding: 5px 12px;
+    margin-right: 15px;
+    border-radius: 5px;
+    color: white;
+    font-weight: bold;
+  }
+  #legend .booked {
+    background-color: #e74c3c;
+  }
+  #legend .free {
+    background-color: #2ecc71;
+  }
+  #addBookingForm {
+    margin-top: 25px;
+    background: white;
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0 0 8px rgba(0,0,0,0.1);
+    max-width: 400px;
+  }
+  #addBookingForm label {
+    display: block;
+    margin-top: 10px;
+  }
+  #addBookingForm select, #addBookingForm input {
+    width: 100%;
+    padding: 6px;
+    margin-top: 5px;
+    box-sizing: border-box;
+  }
+  #addBookingForm button {
+    margin-top: 15px;
+    padding: 10px;
+    background-color: #3498db;
+    border: none;
+    color: white;
+    font-weight: bold;
+    border-radius: 5px;
+    cursor: pointer;
+  }
+  #addBookingForm button:hover {
+    background-color: #2980b9;
+  }
+  #message {
+    margin-top: 15px;
+    font-weight: bold;
+  }
+</style>
 </head>
 <body>
-  <h1>Benvenuto al BnB!</h1>
-  <p>Questa è una pagina base caricata su GitHub Pages.</p>
+
+<h1>BnB Iris - Organizzazione Prenotazioni</h1>
+
+<table id="bookingTable">
+  <thead>
+    <tr>
+      <th>Camere / Giorno</th>
+      <!-- Giorni da 1 a 31 -->
+      <script>
+        for(let d=1; d<=31; d++){
+          document.write(`<th>${d}</th>`);
+        }
+      </script>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><th>Iris</th></tr>
+    <tr><th>Orchidea</th></tr>
+    <tr><th>Lilium</th></tr>
+    <tr><th>Viola</th></tr>
+  </tbody>
+</table>
+
+<div id="legend">
+  <span class="booked">Prenotato</span>
+  <span class="free">Libero</span>
+</div>
+
+<div id="addBookingForm">
+  <h3>Aggiungi una prenotazione</h3>
+  <label for="roomSelect">Seleziona camera:</label>
+  <select id="roomSelect">
+    <option value="0">Iris</option>
+    <option value="1">Orchidea</option>
+    <option value="2">Lilium</option>
+    <option value="3">Viola</option>
+  </select>
+
+  <label for="startDay">Giorno inizio prenotazione (1-31):</label>
+  <input type="number" id="startDay" min="1" max="31" value="1" />
+
+  <label for="endDay">Giorno fine prenotazione (1-31):</label>
+  <input type="number" id="endDay" min="1" max="31" value="1" />
+
+  <button onclick="addBooking()">Aggiungi Prenotazione</button>
+
+  <div id="message"></div>
+</div>
+
+<script>
+  const rooms = ["Iris", "Orchidea", "Lilium", "Viola"];
+  const daysInMonth = 31;
+
+  // Genera le righe della tabella per ogni camera e giorni
+  const tbody = document.querySelector("#bookingTable tbody");
+  tbody.innerHTML = ""; // pulisco righe precedenti
+
+  for(let r=0; r<rooms.length; r++){
+    const tr = document.createElement("tr");
+    const th = document.createElement("th");
+    th.textContent = rooms[r];
+    tr.appendChild(th);
+
+    for(let d=1; d<=daysInMonth; d++){
+      const td = document.createElement("td");
+      td.classList.add("free");
+      td.dataset.room = r;
+      td.dataset.day = d;
+      td.title = "Libero";
+      tr.appendChild(td);
+    }
+    tbody.appendChild(tr);
+  }
+
+  function addBooking(){
+    const roomIndex = parseInt(document.getElementById("roomSelect").value);
+    let start = parseInt(document.getElementById("startDay").value);
+    let end = parseInt(document.getElementById("endDay").value);
+    const messageDiv = document.getElementById("message");
+    messageDiv.textContent = "";
+    
+    if(isNaN(start) || isNaN(end) || start < 1 || end > daysInMonth || start > end){
+      messageDiv.style.color = "red";
+      messageDiv.textContent = "Inserisci giorni validi (1-31) e inizio <= fine.";
+      return;
+    }
+
+    // Controlla se le celle sono libere
+    for(let d = start; d <= end; d++){
+      const cell = document.querySelector(`td[data-room='${roomIndex}'][data-day='${d}']`);
+      if(cell.classList.contains("booked")){
+        messageDiv.style.color = "red";
+        messageDiv.textContent = `Errore: Giorno ${d} per la camera è già prenotato.`;
+        return;
+      }
+    }
+
+    // Segna prenotazione
+    for(let d = start; d <= end; d++){
+      const cell = document.querySelector(`td[data-room='${roomIndex}'][data-day='${d}']`);
+      cell.classList.remove("free");
+      cell.classList.add("booked");
+      cell.title = `Prenotato giorno ${d}`;
+    }
+
+    messageDiv.style.color = "green";
+    messageDiv.textContent = "Prenotazione aggiunta con successo!";
+  }
+</script>
+
 </body>
 </html>
