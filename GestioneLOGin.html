@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Login 2FA BnB</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      max-width: 100%;
+      box-sizing: border-box;
+    }
+    input, button, select {
+      width: 100%;
+      padding: 10px;
+      margin: 8px 0;
+      box-sizing: border-box;
+    }
+    #verification-section, #choose-method, #welcome {
+      display: none;
+    }
+    #error {
+      color: red;
+    }
+    @media (max-width: 600px) {
+      body {
+        padding: 10px;
+      }
+      h2 {
+        font-size: 1.5em;
+      }
+      input, button, select {
+        font-size: 16px;
+      }
+    }
+  </style>
+
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+</head>
+<body>
+
+<h2>Login BnB con 2FA</h2>
+
+<div id="login-section">
+  <input type="email" id="email" placeholder="Email" required />
+  <input type="password" id="password" placeholder="Password" required />
+  <button id="login-btn">Accedi</button>
+</div>
+
+<div id="choose-method">
+  <p>Scegli come ricevere il codice di verifica:</p>
+  <select id="method-select">
+    <option value="email">Email</option>
+    <option value="phone">Telefono</option>
+  </select>
+  <button id="send-code-btn">Invia codice</button>
+</div>
+
+<div id="verification-section">
+  <input type="text" id="code" placeholder="Inserisci codice di verifica" />
+  <button id="verify-code-btn">Verifica</button>
+</div>
+
+<div id="welcome">
+  <h3>Benvenuto! Accesso consentito.</h3>
+  <button id="logout-btn">Logout</button>
+</div>
+
+<p id="error"></p>
+
+<script>
+  // ==== Configura qui il tuo progetto Firebase ====
+  // INSERISCI LA TUA firebaseConfig COMPLETA QUI!
+  // La trovi nella Console Firebase, sezione "Impostazioni Progetto" > "Generali" > "Le tue app"
+  const firebaseConfig = {
+    // TODO: inserisci qui la tua API key e config
+     apiKey: "AIzaSyBemVJSpdaPb94ORXQFbzIHqxOJ03-GbHg",
+  authDomain: "bnb-gestionale.firebaseapp.com",
+  projectId: "bnb-gestionale",
+  storageBucket: "bnb-gestionale.firebasestorage.app",
+  messagingSenderId: "789959283055",
+  appId: "1:789959283055:web:381ace37a927d3dc72989a"
+
+  };
+
+  // Inizializza Firebase
+  firebase.initializeApp(firebaseConfig);
+  const auth = firebase.auth();
+  const db = firebase.firestore();
+
+  // Variabili globali per gestione 2FA
+  let confirmationResult;
+
+  // Elementi DOM
+  const loginSection = document.getElementById('login-section');
+  const chooseMethod = document.getElementById('choose-method');
+  const verificationSection = document.getElementById('verification-section');
+  const welcomeSection = document.getElementById('welcome');
+  const errorMsg = document.getElementById('error');
+
+  const emailInput = document.getElementById('email');
+  const passwordInput = document.getElementById('password');
+  const loginBtn = document.getElementById('login-btn');
+
+  const methodSelect = document.getElementById('method-select');
+  const sendCodeBtn = document.getElementById('send-code-btn');
+
+  const codeInput = document.getElementById('code');
+  const verifyCodeBtn = document.getElementById('verify-code-btn');
+
+  const logoutBtn = document.getElementById('logout-btn');
+
+  // Login con email e password
+  loginBtn.onclick = async () => {
+    errorMsg.textContent = '';
+    const email = emailInput.value.trim();
+    const password = passwordInput.value;
+
+    if (!email || !password) {
+      errorMsg.textContent = 'Inserisci email e password';
+      return;
+    }
+
+    try {
+      const userCredential = await auth.signInWithEmailAndPassword(email, password);
+      const user = userCredential.user;
+
+      // Controlla se l'utente è nella whitelist Firestore
+      const doc = await db.collection('users').doc(user.uid).get();
+      if (!doc.exists) {
+        errorMsg.textContent = 'Utente non autorizzato.';
+        auth.signOut();
+        return;
+      }
+
+      // Salva dati whitelist
+      window.whitelistData = doc.data();
+
+      // Mostra scelta metodo 2FA
+      loginSection.style.display = 'none';
+      chooseMethod.style.display = 'block';
+
+    } catch (e) {
+      errorMsg.textContent = 'Errore login: ' + e.message;
+    }
+  };
+
+  // Funzione per inviare codice via email o telefono
+  sendCodeBtn.onclick = async () => {
+    errorMsg.textContent = '';
+    const method = methodSelect.value;
+    const user = auth.currentUser;
+
+    if (!user) {
+      errorMsg.textContent = 'Utente non loggato.';
+      return;
+    }
+
+    if (method === 'email') {
+      // Email link sign-in per verifica (2FA email)
+      const actionCodeSettings = {
+        url: 'https://roll3213.github.io/BnB-sito/GestioneLOGin.html', // <-- QUI l'URL esatto
+        handleCodeInApp: true,
+      };
+      try {
+        await auth.sendSignInLinkToEmail(user.email, actionCodeSettings);
+        window.localStorage.setItem('emailForSignIn', user.email);
+        alert('Link di verifica inviato all\'email.');
+        chooseMethod.style.display = 'none';
+        verificationSection.style.display = 'block';
+      } catch (err) {
+        errorMsg.textContent = 'Errore invio email: ' + err.message;
+      }
+
+    } else if (method === 'phone') {
+      // Invio codice SMS con Recaptcha (Firebase Phone Auth richiede Recaptcha)
+      window.recaptchaVerifier = new firebase.auth.RecaptchaVerifier(sendCodeBtn, {
+        size: 'invisible',
+        callback: (response) => {
+          // reCAPTCHA risolto, procedi con invio SMS
+        }
+      });
+
+      const phoneNumber = window.whitelistData.phone;
+      if (!phoneNumber) {
+        errorMsg.textContent = 'Numero di telefono non disponibile.';
+        return;
+      }
+
+      try {
+        confirmationResult = await auth.signInWithPhoneNumber(phoneNumber, window.recaptchaVerifier);
+        alert('Codice inviato al telefono.');
+        chooseMethod.style.display = 'none';
+        verificationSection.style.display = 'block';
+      } catch (err) {
+        errorMsg.textContent = 'Errore invio SMS: ' + err.message;
+      }
+
+    }
+  };
+
+  // Verifica codice inserito da utente
+  verifyCodeBtn.onclick = async () => {
+    errorMsg.textContent = '';
+    const method = methodSelect.value;
+    const code = codeInput.value.trim();
+
+    if (!code) {
+      errorMsg.textContent = 'Inserisci il codice.';
+      return;
+    }
+
+    try {
+      if (method === 'email') {
+        alert('Per favore apri il link inviato nella tua email per completare la verifica.');
+      } else if (method === 'phone') {
+        const result = await confirmationResult.confirm(code);
+        showWelcome();
+      }
+    } catch (err) {
+      errorMsg.textContent = 'Codice non valido o errore: ' + err.message;
+    }
+  };
+
+  // Logout
+  logoutBtn.onclick = () => {
+    auth.signOut();
+    resetUI();
+  };
+
+  // Mostra schermata benvenuto
+  function showWelcome() {
+    verificationSection.style.display = 'none';
+    welcomeSection.style.display = 'block';
+  }
+
+  // Resetta UI a login
+  function resetUI() {
+    emailInput.value = '';
+    passwordInput.value = '';
+    codeInput.value = '';
+    errorMsg.textContent = '';
+    loginSection.style.display = 'block';
+    chooseMethod.style.display = 'none';
+    verificationSection.style.display = 'none';
+    welcomeSection.style.display = 'none';
+  }
+
+  // Gestione link email (quando l'utente clicca sul link inviato)
+  window.onload = () => {
+    resetUI();
+    if (auth.isSignInWithEmailLink(window.location.href)) {
+      let email = window.localStorage.getItem('emailForSignIn');
+      if (!email) {
+        email = window.prompt('Inserisci la tua email per confermare il login:');
+      }
+      auth.signInWithEmailLink(email, window.location.href)
+        .then(result => {
+          showWelcome();
+          window.localStorage.removeItem('emailForSignIn');
+        })
+        .catch(err => {
+          errorMsg.textContent = 'Errore verifica email: ' + err.message;
+        });
+    }
+  };
+</script>
+
+</body>
+</html>
